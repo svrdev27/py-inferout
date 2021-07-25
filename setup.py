@@ -16,9 +16,9 @@ setup(
   download_url = 'https://github.com/svrdev27/py-inferout/archive/v0.0.0-alpha.0.tar.gz',
   keywords = ['distributed', 'scale', 'ML', 'models', 'serving', 'inference', 'framework'],
   install_requires=[
-          'aioredis',
-          'aiohttp',
-          'ConfigArgParse'
+          'aioredis>=2.0.0b1',
+          'aiohttp>=3.7.4',
+          'ConfigArgParse>=1.5.1'
       ],
   classifiers=[
     'Development Status :: 3 - Alpha',
