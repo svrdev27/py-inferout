@@ -24,6 +24,10 @@ from .serving_engines.base import ServingEngine
 from . import exceptions
 from . import worker_annotators
 
+import os
+import sys
+sys.path.append(os.getcwd())
+
 WORKER_ANNOTATORS = [worker_annotators.serving_endpoint_from_options]
 
 WORKER_KEY = '{{@worker-{}}}'
@@ -191,22 +195,22 @@ class Worker(object):
 
     async def channel_reader(self):
         while not self.shutdown_requested:
+            message = None
             try:
                 async with async_timeout.timeout(1):
                     message = await self.worker_pubsub.get_message(ignore_subscribe_messages=True)
-                    if message is not None:
-                        logging.debug(f"(Worker Reader) Message Received: {message}")
-                        data = json.loads(message["data"])
-                        if data["event_type"] == "MODEL_INSTANCE_SCHEDULED":
-                            await self.handle_model_instance_scheduled(data["event_data"])
-                        elif data["event_type"] == "TERMINATE_MODEL_INSTANCE":
-                            await self.handle_terminate_model_instance(data["event_data"])
-                        else:
-                            logging.info("Unknown event type %s, skipping", data["event_type"])
-
                     await asyncio.sleep(0.01)
             except asyncio.TimeoutError:
                 pass
+            if message is not None:
+                logging.debug(f"(Worker Reader) Message Received: {message}")
+                data = json.loads(message["data"])
+                if data["event_type"] == "MODEL_INSTANCE_SCHEDULED":
+                    await self.handle_model_instance_scheduled(data["event_data"])
+                elif data["event_type"] == "TERMINATE_MODEL_INSTANCE":
+                    await self.handle_terminate_model_instance(data["event_data"])
+                else:
+                    logging.info("Unknown event type %s, skipping", data["event_type"])
     
     async def activate_model_instance(self, model_instance: ModelInstance):
         ns = model_instance.model.namespace

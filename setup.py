@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 setup(
   name = 'inferout',
   packages = find_packages(),
-  version = '0.0.0a0',
+  version = '0.0.0a2',
   license='GPLv3',
   description = 'Distributed Scale Out Framework for ML models serving/inference',
   long_description=long_description,

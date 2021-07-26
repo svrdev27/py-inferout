@@ -190,20 +190,20 @@ class Scheduler(object):
 
     async def channel_reader(self):
         while not self.shutdown_requested:
+            message = None
             try:
                 async with async_timeout.timeout(1):
                     message = await self.pubsub.get_message(ignore_subscribe_messages=True)
-                    if message is not None:
-                        logging.debug(f"(Scheduler Reader) Message Received: {message}")
-                        data = json.loads(message["data"])
-                        if data["event_type"] == "WORKER_UPDATE":
-                            await self.handle_worker_update(data["event_data"])
-                        else:
-                            logging.info("Unknown event type %s, skipping", data["event_type"])
-
                     await asyncio.sleep(0.01)
             except asyncio.TimeoutError:
                 pass
+            if message is not None:
+                logging.debug(f"(Scheduler Reader) Message Received: {message}")
+                data = json.loads(message["data"])
+                if data["event_type"] == "WORKER_UPDATE":
+                    await self.handle_worker_update(data["event_data"])
+                else:
+                    logging.info("Unknown event type %s, skipping", data["event_type"])
     
     async def setup_pubsub(self):
         self.pubsub = self.cluster.redis.pubsub()
