@@ -33,6 +33,7 @@ SCHEDULER_SLEEP_WARNNING_DURATION = 3
 SCHEDULER_LOCK_ERROR_SLEEP_DURATION = 0.5
 SCHEDULER_KEY = "@scheduler"
 MODEL_INSTANCE_SCHEDULED_SLEEP_DURATION = 0.1
+MAX_MODEL_INSTANCE_SCHEDULED_PER_CYCLE = 20
 
 class Scheduler(object):
     def __init__(self, cluster: Cluster, worker: Worker) -> None:
@@ -51,10 +52,8 @@ class Scheduler(object):
         if serving_engine:
             workers = filter(lambda x: serving_engine in x["available_serving_engines"], workers)
         
-        if not workers:
-            return None
         workers = sorted(workers, key=lambda x: int(x["model_instances_count"]))
-        return workers[0]["id"]
+        return workers[0]["id"] if workers else None
     
     async def refresh_active_workers_data(self):
         active_workers_map = {}
@@ -64,6 +63,7 @@ class Scheduler(object):
         self.active_workers_map = active_workers_map
 
     async def schedule_once(self):
+        instances_scheduled_count = 0
         cluster = self.cluster
         async for each in cluster.redis.scan_iter(
             cluster.get_redis_key(
@@ -175,8 +175,13 @@ class Scheduler(object):
                             "event_data": event_data
                         })
                 )
-                await asyncio.sleep(MODEL_INSTANCE_SCHEDULED_SLEEP_DURATION)
                 logging.info("scheduled model instance %s", event_data)
+                instances_scheduled_count +=1
+                if(instances_scheduled_count>=MAX_MODEL_INSTANCE_SCHEDULED_PER_CYCLE):
+                    logging.warning("instances_scheduled_count=%d, reached max limit per cycle, skipping other pending",
+                    instances_scheduled_count)
+                    return
+                await asyncio.sleep(MODEL_INSTANCE_SCHEDULED_SLEEP_DURATION)
 
     async def handle_worker_update(self, event_data):
         logging.debug("handle_worker_update %s", event_data)
