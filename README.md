@@ -16,7 +16,7 @@ $ python -m pip install inferout
 ### Usage (Quick example)
 - First of all we need an ml model to be able to serve. It can be of any kind, any framework (pytorch, tensorflow, rasa, etc.) as long as it can be loaded in python 3.7+
 - We need to implement two interfaces
-  - serving_engine - this is to teach inferout how to load, serve (infer), and unload the models of a specific kind/usecase. [example](examples/rasa-nlu/my_rasa_nlu/storage_engine.py)
+  - serving_engine - this is to teach inferout how to load, serve (infer), and unload the models of a specific kind/usecase. [example](examples/rasa-nlu/my_rasa_nlu/serving_engine.py)
   - storage_engine - this is to teach inferout how to get/download/locate the models. [example](examples/rasa-nlu/my_rasa_nlu/storage_engine.py)
 - Get redis server ready. Yes we need redis to use inferout. inferout uses redis to store metadata and pass messages between diferent componets and nodes. https://redis.io/download
 - Bootstrap cluster - this is create minimum metadata required to run cluster all you need is a cluster name and a redis URL
@@ -70,5 +70,5 @@ $ python -m pip install inferout
   - management API - create/update/delete/inspect models, namespaces, workers
   - inferencing API - to quiry models
 - What next?
-  Explorer other management APIs, for now just find API endpoints in [source code](inferout/management_api.py#L170)
+  Explore other management APIs, for now just find API endpoints in [source code](inferout/management_api.py#L170)
   
