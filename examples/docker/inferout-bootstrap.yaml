@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inferout-bootstarp
+  namespace: inferout
+spec:
+  template:
+    spec:
+      containers:
+      - name: bootstrap
+        image: inferout-dev
+        imagePullPolicy: Never
+        command: ["bash", "-c", "inferout bootstrap_cluster --cluster-name dev --redis-url redis://redis-leader"]
+        env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+      restartPolicy: Never
+  backoffLimit: 1

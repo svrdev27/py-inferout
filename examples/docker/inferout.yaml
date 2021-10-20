@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inferout
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferout
+  namespace: inferout
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      bb: web
+  template:
+    metadata:
+      labels:
+        bb: web
+    spec:
+      volumes:
+      - name: host-mount
+        hostPath:
+          path: "/tmp/infer_models"
+      containers:
+      - name: worker
+        image: inferout-dev
+        imagePullPolicy: Never
+        #command: ["sleep", "99999999"]
+        command: ["bash","-c","inferout worker --cluster-name dev --redis-url redis://redis-leader --plugins inferout.plugins.k8s"]
+        env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+        volumeMounts:
+          - name: host-mount
+            mountPath: "/tmp/infer_models"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferout
+  namespace: inferout
+spec:
+  type: NodePort
+  selector:
+    bb: web
+  ports:
+  - name: management-api
+    port: 9500
+    targetPort: 9500
+    nodePort: 30500
+  - name: serving-api
+    port: 9510
+    targetPort: 9510
+    nodePort: 30510
+
