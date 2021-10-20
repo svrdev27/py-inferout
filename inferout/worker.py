@@ -19,6 +19,7 @@ from . import management_api
 from . import serving_api
 from aiohttp import web
 import re
+from .plugins.base import Plugin
 from .storage_engines.base import StorageEngine
 from .serving_engines.base import ServingEngine
 from . import exceptions
@@ -47,9 +48,17 @@ class Worker(object):
         self.storage_engines = {}
         self.serving_engines = {}
 
+        self.plugin_instances = {}
+        self.plugins_context = {}
+
         self.serving_endpoint = None
 
+        self.attributes = {}
+
+        self.rack = ""
+
         self.local_model_instances = {}
+        
     
     async def report_forever(self):
         while True:
@@ -64,9 +73,11 @@ class Worker(object):
             data = {
                 "state": self.state,
                 "serving_endpoint": self.serving_endpoint,
+                "rack": self.rack,
                 "available_storage_engines": json.dumps(list(self.storage_engines.keys())),
                 "available_serving_engines": json.dumps(list(self.serving_engines.keys())),
-                "model_instances_count": len(self.local_model_instances)
+                "model_instances_count": len(self.local_model_instances),
+                "attributes": json.dumps(self.attributes)
                 }
             logging.debug("Reporting %s %s", self.worker_key, data)
             
@@ -102,6 +113,11 @@ class Worker(object):
         worker_data["available_storage_engines"] = json.loads(worker_data["available_storage_engines"])
         worker_data["available_serving_engines"] = json.loads(worker_data["available_serving_engines"])
         worker_data["model_instances_count"] = int(worker_data["model_instances_count"])
+        if worker_data.get("attributes"):
+            worker_data["attributes"] = json.loads(worker_data["attributes"])
+        else:
+            worker_data["attributes"] = {}
+
         return worker_data
 
     async def get_all_workers_data(self):
@@ -116,6 +132,84 @@ class Worker(object):
         return await self.get_worker_data_from_redis(
             self.cluster.get_redis_key(WORKER_KEY.format(worker_id)
         ))
+
+    def load_plugins(self, plugins: list):
+        for each in plugins:
+            plugin_module = __import__(each,fromlist=[each])
+            if not issubclass(plugin_module.Plugin, Plugin):
+                raise ValueError("Invalid Plugin ",each)
+            plugin_instance = plugin_module.Plugin()
+            plugin_instance.load()
+            self.plugin_instances[plugin_module.__name__] = plugin_instance
+    
+    def apply_plugins(self):
+        self.plugins_context={"worker_attributes": {}}
+        for key, plugin in self.plugin_instances.items():
+            try:
+                management_host = plugin.get_management_host()
+            except NotImplementedError:
+                management_host = None
+            try:
+                management_port = plugin.get_management_port()
+            except NotImplementedError:
+                management_port = None
+            try:
+                serving_host = plugin.get_serving_host()
+            except NotImplementedError:
+                serving_host = None
+            try:
+                serving_port = plugin.get_serving_port()
+            except NotImplementedError:
+                serving_port = None
+            try:
+                rack_format = plugin.get_rack_format()
+            except NotImplementedError:
+                rack_format = None
+            try:
+                worker_attributes = plugin.get_worker_attributes()
+            except NotImplementedError:
+                worker_attributes = {}
+
+            self.plugins_context["management_host"] = management_host or self.plugins_context.get("management_host")
+            self.plugins_context["management_port"] = management_port or self.plugins_context.get("management_port")
+            self.plugins_context["serving_host"] = serving_host or self.plugins_context.get("serving_host")
+            self.plugins_context["serving_port"] = serving_port or self.plugins_context.get("serving_port")
+            self.plugins_context["rack_format"] = rack_format or self.plugins_context.get("rack_format")
+
+            self.plugins_context["worker_attributes"].update(worker_attributes)
+
+        if self.plugins_context["management_host"]:
+            if self.options.default_options_map["host"] is self.options.management_host:
+                self.options.management_host = self.plugins_context["management_host"]
+        if self.plugins_context["management_port"]:
+            if self.options.default_options_map["management-port"] is self.options.management_port:
+                self.options.management_port = self.plugins_context["management_port"]
+        if self.plugins_context["serving_host"]:
+            if self.options.default_options_map["host"] is self.options.serving_host:
+                self.options.serving_host = self.plugins_context["serving_host"]
+        if self.plugins_context["serving_port"]:
+            if self.options.default_options_map["serving-port"] is self.options.serving_port:
+                self.options.serving_port = self.plugins_context["serving_port"]
+        
+        if self.plugins_context["rack_format"]:
+            if self.options.rack_format is None:
+                self.options.rack_format = self.plugins_context["rack_format"]
+
+        if self.plugins_context["worker_attributes"]:
+            self.attributes = self.plugins_context["worker_attributes"]
+
+    def compute_rack(self):
+        if self.options.rack:
+            self.rack = self.options.rack
+        elif self.options.rack_format:
+            self.rack = self.options.rack_format.format(**self.attributes)
+    
+    def clean_options(self):
+        #this makes ["abc1,abc2","abc3"] to ["abc1","abc2","abc3"]
+        self.options.storage_engines = list(filter(None,",".join(self.options.storage_engines).split(",")))
+        self.options.serving_engines = list(filter(None,",".join(self.options.serving_engines).split(",")))
+        self.options.plugins = list(filter(None,",".join(self.options.plugins).split(",")))
+
 
     def load_serving_engines(self, engines: list):
         for each in engines:
@@ -332,8 +426,15 @@ class Worker(object):
 
     async def run_forever(self):
         from .scheduler import Scheduler
+
+        self.clean_options()
+
+        self.load_plugins(self.options.plugins)
+        self.apply_plugins()
         
         await self.apply_worker_annotators()
+
+        self.compute_rack()
 
         management_api_runner = web.AppRunner(management_api.app)
         management_api.context_worker.set(self)
