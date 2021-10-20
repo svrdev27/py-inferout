@@ -1,0 +1,4 @@
+aioredis>=2.0.0b1
+aiohttp>=3.7.4
+ConfigArgParse>=1.5.1
+contextvars>=2.4
