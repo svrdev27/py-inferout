@@ -178,24 +178,24 @@ class Worker(object):
 
             self.plugins_context["worker_attributes"].update(worker_attributes)
 
-        if self.plugins_context["management_host"]:
+        if self.plugins_context.get("management_host"):
             if self.options.default_options_map["host"] is self.options.management_host:
                 self.options.management_host = self.plugins_context["management_host"]
-        if self.plugins_context["management_port"]:
+        if self.plugins_context.get("management_port"):
             if self.options.default_options_map["management-port"] is self.options.management_port:
                 self.options.management_port = self.plugins_context["management_port"]
-        if self.plugins_context["serving_host"]:
+        if self.plugins_context.get("serving_host"):
             if self.options.default_options_map["host"] is self.options.serving_host:
                 self.options.serving_host = self.plugins_context["serving_host"]
-        if self.plugins_context["serving_port"]:
+        if self.plugins_context.get("serving_port"):
             if self.options.default_options_map["serving-port"] is self.options.serving_port:
                 self.options.serving_port = self.plugins_context["serving_port"]
         
-        if self.plugins_context["rack_format"]:
+        if self.plugins_context.get("rack_format"):
             if self.options.rack_format is None:
                 self.options.rack_format = self.plugins_context["rack_format"]
 
-        if self.plugins_context["worker_attributes"]:
+        if self.plugins_context.get("worker_attributes"):
             self.attributes = self.plugins_context["worker_attributes"]
 
     def compute_rack(self):
