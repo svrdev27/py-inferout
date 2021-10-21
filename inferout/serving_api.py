@@ -50,14 +50,17 @@ async def handle_infer_post(request):
         pass
     
     version = None
-    if version_id in ("_latest", "latest", None):
+    if version_id in ("_latest", "latest"):
         version = models.ModelVersion(model=model, id=str(model.latest_version_id))
+    elif version_id in (None, "", "any", "_latest_available"):
+        version = None
     else:
         version = models.ModelVersion(model=model, id=version_id)
-    try:
-        await version.read()
-    except exceptions.NotFoundException:#updating
-        pass
+    if version is not None:
+        try:
+            await version.read()
+        except exceptions.NotFoundException:#updating
+            pass
 
     instances_data = await models.ModelInstance.get_all_as_list(
         cluster=worker.cluster,
@@ -76,6 +79,12 @@ async def handle_infer_post(request):
     
     if local_instance_data:
         logging.info("Serving from local worker")
+        if version is None:
+            version = models.ModelVersion(model=model, id=local_instance_data["model_version_id"])
+            try:
+                await version.read()
+            except exceptions.NotFoundException:#updating
+                pass
         instance = models.ModelInstance(model_version=version,id=local_instance_data["id"])
         output_data = await worker.do_infer(model_instance=instance, data=input_data)
         return web.json_response({
