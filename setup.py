@@ -17,7 +17,7 @@ with open('requirements.txt') as f:
 setup(
   name = 'inferout',
   packages = find_packages(),
-  version = '0.0.0a3',
+  version = '0.0.0a5',
   license='GPLv3',
   description = 'Distributed Scale Out Framework for ML models serving/inference',
   long_description=long_description,
